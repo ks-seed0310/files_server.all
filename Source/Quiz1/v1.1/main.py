@@ -119,6 +119,7 @@ def quiz_end():
 
 もう一度実行する場合は y を、もう実行しない場合は n を入力してください。
 """)
+    answer=None
     while not(answer=="y" or answer=="n"):
         answer=input("ここに入力")
     if answer=="y":
