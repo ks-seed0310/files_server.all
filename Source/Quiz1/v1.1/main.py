@@ -1,3 +1,6 @@
+#(c) 2024-2025 Rintaro Takeda
+#Quiz1 v1.1
+#Quiz1 version: Version 1.1.0.3
 import random as rd
 import math as Math
 
@@ -14,12 +17,33 @@ data={
     "quiz":{
         
     },
+    "pointALL":0,
 }
 play={
     "point":0,
     "clear":0,
     "":0,
 }
+def reset(play_,data_):
+    global data
+    global play
+    if data_:
+        data={
+            "temporary":"",
+            "temporary_1":"",
+            "input":None,
+            "quiz_count":"",
+            "quiz":{
+        
+            },
+            "pointALL":0,
+        }
+    if play_:
+        play={
+            "point":0,
+            "clear":0,
+            "":0,
+        }
 
 def quizcount_query():
     global data
@@ -51,35 +75,42 @@ def quizcount_query():
 def quiz_():
     global data
     global QuizData
+    reset(data_=False,play_=True)
+    data["pointALL"]=0
     for count_____ in range(1,data["quiz_count"]+1):
+        data["Q_Num"]=rd.randint(0,len(QuizText)-1)
+        QuizData=[
+            QuizText[data["Q_Num"]],
+            QuizAnswer[data["Q_Num"]],
+            QuizPoint[data["Q_Num"]],
+            QuizCheck[data["Q_Num"]],
+        ]
         while True:
-            data["Q_Num"]=rd.randint(0,len(QuizText)-1)
-            QuizData=[
-                QuizText[data["Q_Num"]],
-                QuizAnswer[data["Q_Num"]],
-                QuizPoint[data["Q_Num"]],
-                QuizCheck[data["Q_Num"]],
-            ]
             try:
                 print(count_____," 問目\n",QuizData[0])
                 data["temporary_2"]=input("ここに答えを入力")
+                data["pointALL"]+=QuizData[2]
                 if QuizData[3]:
                     data["temporary_2"]=split_2(data["temporary_2"])
                     if textcheck(data["temporary_2"], QuizData[1]):
-                        print("正解!!\n+",QuizData[2],"point")
+                        print("正解!!\n+",QuizData[2],"point","\n")
                         play["point"]+=QuizData[2]
                         play["clear"]+=1
                         break
                     else:
+                        if data["temporary_2"]==[]:
+                            continue
                         print("不正解。\n入力:",data["temporary_2"],"\n","解答:",QuizData[1],"\n")
                         break
                 else:
                     if data["temporary_2"]==QuizData[1]:
-                        print("正解!!\n+",QuizData[2],"point")
+                        print("正解!!\n+",QuizData[2],"point","\n")
                         play["point"]+=QuizData[2]
                         play["clear"]+=1
                         break
                     else:
+                        if data["temporary_2"]==[]:
+                            continue
                         print("不正解。\n入力:",data["temporary_2"],"\n","解答:",QuizData[1],"\n")
                         break
             except:
@@ -111,11 +142,13 @@ def quiz_end():
     print(f"""
 
 クイズ終了!
-クイズ数: {data["quiz_count"]} 問
-　正解数: {play['clear']} 問
-不正解数: {data["quiz_count"]-play['clear']} 問
-　　得点: {play['point']} 点
-　正解率: {Math.floor((play['clear']/data["quiz_count"])*10000)/100} %
+　　クイズ数: {data["quiz_count"]} 問
+　　　正解数: {play['clear']} 問
+　　不正解数: {data["quiz_count"]-play['clear']} 問
+　　　　得点: {play['point']} 点
+　　最大得点: {data["pointALL"]} 点
+百点満点得点: {Math.floor((play['point']/data["pointALL"])*1000000)/10000} 点
+　　　正解率: {Math.floor((play['clear']/data["quiz_count"])*1000000)/10000} %
 
 もう一度実行する場合は y を、もう実行しない場合は n を入力してください。
 """)
