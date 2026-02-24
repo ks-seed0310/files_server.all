@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XOR-RD Studio</title>
-    <!-- あなたの最強エンジンを読み込み -->
+    <!-- あなたの最強エンジンを外部から読み込み -->
     <script src="https://ks-seed0310.github.io/files_server.all/Source/Encryption1/Encryption_main.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
@@ -20,7 +20,7 @@
         textarea { height: 80px; resize: none; font-family: monospace; }
         .btn-exec { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
         #resultBox { margin-top: 20px; padding: 15px; background: #e7f3ff; border-radius: 8px; display: none; border: 1px solid #cce5ff; }
-        .key-display { width: 100%; height: 50px; font-size: 0.75rem; margin-top: 10px; background: #fff; }
+        .key-display { width: 100%; height: 60px; font-size: 0.75rem; margin-top: 10px; background: #fff; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -39,24 +39,25 @@
     </div>
 
     <div class="input-group">
-        <label id="keyLabel">鍵 (改行区切り):</label>
-        <textarea id="keyInput" placeholder="Pass1&#10;Pass2"></textarea>
+        <label id="keyLabel">秘密鍵の登録 (改行区切り):</label>
+        <textarea id="keyInput" placeholder="ひらがなパスワード1&#10;MyPassword2"></textarea>
     </div>
 
     <button class="btn-exec" onclick="run()">実行 & ダウンロード</button>
 
     <div id="resultBox">
-        <label>生成された合体鍵 (keyAllBase64):</label>
+        <label>生成された解除キー (keyAllBase64):</label>
         <textarea id="outputKey" class="key-display" readonly></textarea>
-        <div style="font-size:0.7rem; color:#666; margin-top:5px;">※鍵ファイルも自動DLされました</div>
+        <div style="font-size:0.7rem; color:#666; margin-top:5px;">※鍵ファイル(.txt)も先にダウンロードされました</div>
     </div>
 </div>
 
 <script>
+// UI切り替え
 function toggleUI() {
     const isEnc = document.getElementById('encMode').checked;
-    document.getElementById('keyLabel').innerText = isEnc ? "鍵 (改行区切り):" : "合体鍵 (keyAllBase64) を入力:";
-    document.getElementById('keyInput').placeholder = isEnc ? "Pass1\nPass2" : "Base64_Base64...";
+    document.getElementById('keyLabel').innerText = isEnc ? "秘密鍵の登録 (改行区切り):" : "解除キー (keyAllBase64) を入力:";
+    document.getElementById('keyInput').placeholder = isEnc ? "ひらがなパスワード1\nMyPassword2" : "Base64_Base64...";
     document.getElementById('resultBox').style.display = "none";
 }
 
@@ -65,54 +66,59 @@ async function run() {
     const keyInput = document.getElementById('keyInput');
     const isEnc = document.getElementById('encMode').checked;
 
-    // ファイルが選択されているか確認
-    if (fileInput.files.length === 0) return alert("ファイルを選んでね！");
-    const file = fileInput.files[0]; // 1つ目のファイルを取得
+    // ファイルチェック
+    if (fileInput.files.length === 0) return alert("ファイルを選択してください！");
+    const file = fileInput.files[0];
 
-    if (!keyInput.value.trim()) return alert("鍵を入力してね！");
+    // 鍵チェック
+    const rawKeyText = keyInput.value.trim();
+    if (!rawKeyText) return alert("鍵を入力してください！");
 
     try {
         const arrayBuffer = await file.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
 
-        const rawKeyText = keyInput.value.trim();
-        const keyParam = (isEnc && !rawKeyText.includes("_")) ? rawKeyText.split('\n').filter(s => s) : rawKeyText;
+        let keyParam;
+        if (isEnc) {
+            // 【暗号化時】各行の「生」の入力を確実にTextEncoderでバイナリ化し、即座にBase64文字列に変換
+            keyParam = rawKeyText.split('\n').filter(s => s).map(s => {
+                // 最新の toBase64() メソッドを使用
+                return new TextEncoder().encode(s).toBase64();
+            });
+        } else {
+            // 【復号時】生成済みの keyAllBase64 をそのまま渡す
+            keyParam = rawKeyText;
+        }
 
-        // 外部JSの関数を実行
+        // --- 外部JS Encryption_main.js の関数を呼び出し ---
         const res = xorRdUint8(data, 8, 1, keyParam);
 
-        // --- 1. 【暗号化時のみ】先に鍵ファイルをダウンロード ---
+        // 1. 先に鍵ファイルをダウンロード (暗号化時のみ)
         if (isEnc) {
-            const keyInfo = `File: ${file.name}\nKeyAllBase64:\n${res.keyAllBase64}`;
-            const kBlob = new Blob([keyInfo], { type: "text/plain" });
-            const kUrl = URL.createObjectURL(kBlob);
+            const keyInfo = `Original File: ${file.name}\nMaster Key (keyAllBase64):\n${res.keyAllBase64}`;
             const kLink = document.createElement("a");
-            kLink.href = kUrl;
+            kLink.href = URL.createObjectURL(new Blob([keyInfo], { type: "text/plain" }));
             kLink.download = file.name + "_key.txt";
             kLink.click();
-            URL.revokeObjectURL(kUrl);
 
-            // 画面表示
             document.getElementById('resultBox').style.display = "block";
             document.getElementById('outputKey').value = res.keyAllBase64;
         }
 
-        // --- 2. 処理済みファイルのダウンロード ---
-        const blob = new Blob([res.result], { type: "application/octet-stream" });
-        const url = URL.createObjectURL(blob);
+        // 2. 本体ファイルをダウンロード (拡張子キープ仕様)
         const a = document.createElement("a");
-        a.href = url;
+        a.href = URL.createObjectURL(new Blob([res.result], { type: "application/octet-stream" }));
         a.download = isEnc ? file.name + ".bin" : file.name.replace(/\.bin$/i, "");
         
-        // 連続DLのために少しだけ遅延させる（ブラウザのブロック回避策）
+        // 連続DL回避の遅延
         setTimeout(() => {
             a.click();
-            URL.revokeObjectURL(url);
-        }, 100);
+            URL.revokeObjectURL(a.href);
+        }, 150);
 
     } catch (e) {
         console.error(e);
-        alert("エラー！JSの読み込みか鍵の形式を確認してね。");
+        alert("エラーが発生しました。コンソールまたは鍵の形式を確認してください。");
     }
 }
 </script>
