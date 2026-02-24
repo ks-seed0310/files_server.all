@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XOR-RD Studio</title>
+    <!-- あなたの最強エンジンを読み込み -->
+    <script src="https://ks-seed0310.github.io/files_server.all/Source/Encryption1/Encryption_main.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; width: 95%; max-width: 450px; padding: 25px; border-radius: 15px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; margin-top: 0; }
+        .mode-group { display: flex; background: #eee; padding: 5px; border-radius: 10px; margin-bottom: 20px; }
+        .mode-group label { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 8px; }
+        .mode-group input { display: none; }
+        .mode-group input:checked + span { background: white; display: block; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: bold; padding: 5px 0; }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.85rem; margin-bottom: 5px; color: #666; }
+        input[type="file"], textarea { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
+        textarea { height: 80px; resize: none; font-family: monospace; }
+        .btn-exec { width: 100%; padding: 15px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; }
+        #resultBox { margin-top: 20px; padding: 15px; background: #e7f3ff; border-radius: 8px; display: none; border: 1px solid #cce5ff; }
+        .key-display { width: 100%; height: 50px; font-size: 0.75rem; margin-top: 10px; background: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>XOR-RD Studio</h2>
+    
+    <div class="mode-group">
+        <label><input type="radio" name="mode" id="encMode" value="encode" checked onchange="toggleUI()"><span>暗号化</span></label>
+        <label><input type="radio" name="mode" id="decMode" value="decode" onchange="toggleUI()"><span>復号</span></label>
+    </div>
+
+    <div class="input-group">
+        <label>ファイルを選択:</label>
+        <input type="file" id="fileInput">
+    </div>
+
+    <div class="input-group">
+        <label id="keyLabel">鍵 (改行区切り):</label>
+        <textarea id="keyInput" placeholder="Pass1&#10;Pass2"></textarea>
+    </div>
+
+    <button class="btn-exec" onclick="run()">実行 & ダウンロード</button>
+
+    <div id="resultBox">
+        <label>生成された合体鍵 (keyAllBase64):</label>
+        <textarea id="outputKey" class="key-display" readonly></textarea>
+        <div style="font-size:0.7rem; color:#666; margin-top:5px;">※鍵ファイルも自動DLされました</div>
+    </div>
+</div>
+
+<script>
+function toggleUI() {
+    const isEnc = document.getElementById('encMode').checked;
+    document.getElementById('keyLabel').innerText = isEnc ? "鍵 (改行区切り):" : "合体鍵 (keyAllBase64) を入力:";
+    document.getElementById('keyInput').placeholder = isEnc ? "Pass1\nPass2" : "Base64_Base64...";
+    document.getElementById('resultBox').style.display = "none";
+}
+
+async function run() {
+    const fileInput = document.getElementById('fileInput');
+    const keyInput = document.getElementById('keyInput');
+    const isEnc = document.getElementById('encMode').checked;
+
+    // ファイルが選択されているか確認
+    if (fileInput.files.length === 0) return alert("ファイルを選んでね！");
+    const file = fileInput.files[0]; // 1つ目のファイルを取得
+
+    if (!keyInput.value.trim()) return alert("鍵を入力してね！");
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+
+        const rawKeyText = keyInput.value.trim();
+        const keyParam = (isEnc && !rawKeyText.includes("_")) ? rawKeyText.split('\n').filter(s => s) : rawKeyText;
+
+        // 外部JSの関数を実行
+        const res = xorRdUint8(data, 8, 1, keyParam);
+
+        // --- 1. 【暗号化時のみ】先に鍵ファイルをダウンロード ---
+        if (isEnc) {
+            const keyInfo = `File: ${file.name}\nKeyAllBase64:\n${res.keyAllBase64}`;
+            const kBlob = new Blob([keyInfo], { type: "text/plain" });
+            const kUrl = URL.createObjectURL(kBlob);
+            const kLink = document.createElement("a");
+            kLink.href = kUrl;
+            kLink.download = file.name + "_key.txt";
+            kLink.click();
+            URL.revokeObjectURL(kUrl);
+
+            // 画面表示
+            document.getElementById('resultBox').style.display = "block";
+            document.getElementById('outputKey').value = res.keyAllBase64;
+        }
+
+        // --- 2. 処理済みファイルのダウンロード ---
+        const blob = new Blob([res.result], { type: "application/octet-stream" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = isEnc ? file.name + ".bin" : file.name.replace(/\.bin$/i, "");
+        
+        // 連続DLのために少しだけ遅延させる（ブラウザのブロック回避策）
+        setTimeout(() => {
+            a.click();
+            URL.revokeObjectURL(url);
+        }, 100);
+
+    } catch (e) {
+        console.error(e);
+        alert("エラー！JSの読み込みか鍵の形式を確認してね。");
+    }
+}
+</script>
+</body>
+</html>
