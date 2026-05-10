@@ -45,7 +45,7 @@ class xorEncrypt{
         }
         const u32b=new Uint8Array(u32.buffer)
         const comb=new Uint8Array(u32b.length+1)
-        comb[0]=(4-val_byte)%4
+        comb[0]=4-val_byte%4
         comb.set(u32b,1)
         const ak_sub=((BigInt(kp)<<32n)+(BigInt(k)))
         return {
@@ -53,7 +53,7 @@ class xorEncrypt{
             resBase64:u32b.toBase64(),
             respackBase64:comb.toBase64(),
             key:[k,kp],
-            ak:ak_sub.toString(16).padStart(ak_sub>=4294967296?16:8)
+            ak:ak_sub.toString(16).padStart(ak_sub>=4294967296?16:8,0)
         }
     }
     decrypt1(value,keys){
